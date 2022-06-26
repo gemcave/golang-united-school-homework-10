@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,11 @@ main function reads host/port from env just for an example, flavor it following 
 func Start(host string, port int) {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/name/{PARAM}", handleName).Methods("GET")
+	router.HandleFunc("/bad", handleServerError).Methods("GET")
+	router.HandleFunc("/data", handleData).Methods("POST")
+	router.HandleFunc("/headers", handleHeader).Methods("POST")
+
 	log.Println(fmt.Printf("Starting API server on %s:%d\n", host, port))
 	if err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), router); err != nil {
 		log.Fatal(err)
@@ -35,4 +41,41 @@ func main() {
 		port = 8081
 	}
 	Start(host, port)
+}
+
+func handleName(w http.ResponseWriter, r *http.Request) {
+	p := mux.Vars(r)["PARAM"]
+	s := fmt.Sprintf("Hello, %s!", p)
+	fmt.Fprint(w, s)
+}
+
+func handleServerError(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(500)
+}
+
+func handleData(w http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Fatal(err)
+	}
+	fmt.Println(string(data))
+	param := fmt.Sprintf("I got message:\n%s", string(data))
+
+	w.Write([]byte(param))
+}
+
+func handleHeader(w http.ResponseWriter, r *http.Request) {
+	a, err := strconv.Atoi(r.Header.Get("a"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Fatal(err)
+	}
+	b, err := strconv.Atoi(r.Header.Get("b"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Fatal(err)
+	}
+	result := strconv.Itoa(a + b)
+	w.Header().Set("a+b", result)
 }
